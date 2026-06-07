@@ -196,6 +196,57 @@ export default function PdfEstimation() {
           let foundDetails: Partial<EstimationDetails> = {};
           let fullCombinedText = '';
           let tempSrCounter = 1;
+          let currentItem: any = null;
+
+          const saveCurrentItem = () => {
+            if (currentItem) {
+              if (!currentItem.partNumber || currentItem.partNumber === '') {
+                currentItem.partNumber = 'N/A';
+              }
+              if (!currentItem.partName || currentItem.partName === '') {
+                currentItem.partName = 'Automotive Component';
+              }
+
+              // Guard against duplicates
+              const isDuplicated = extractedItems.some(
+                (item) => item.sr === currentItem.sr && item.partNumber === currentItem.partNumber
+              );
+              if (!isDuplicated) {
+                extractedItems.push({
+                  id: Math.random().toString(36).substring(2, 9),
+                  sr: currentItem.sr,
+                  partNumber: currentItem.partNumber.trim(),
+                  partName: currentItem.partName.trim(),
+                  status: '✔️APPROVED',
+                  qty: currentItem.qty || 1,
+                  unitCategory: currentItem.unitCategory || 'PCS',
+                  price: currentItem.price || 0,
+                  taxes: currentItem.taxes || 18,
+                  amount: currentItem.amount || ((currentItem.qty || 1) * (currentItem.price || 0))
+                });
+              }
+            }
+            currentItem = null;
+          };
+
+          const tryParseNumericCell = (cellStr: string) => {
+            const regex = /([\d,.]+)\s*(Unit|LTR|PCS|KG|BOX|SET|[A-Za-z]+)?\s*(Customer)?\s*([\d,.]+)\s*(GST)?/i;
+            const match = cellStr.match(regex);
+            if (match) {
+              const qRaw = match[1].replace(/,/g, '');
+              const pRaw = match[4].replace(/,/g, '');
+              const qtyVal = parseFloat(qRaw);
+              const priceVal = parseFloat(pRaw);
+              if (!isNaN(qtyVal) && !isNaN(priceVal)) {
+                return {
+                  qty: qtyVal,
+                  unitCategory: match[2] || 'PCS',
+                  price: priceVal
+                };
+              }
+            }
+            return null;
+          };
 
           // Loop pages and analyze text
           for (let pNum = 1; pNum <= pdf.numPages; pNum++) {
@@ -273,142 +324,107 @@ export default function PdfEstimation() {
                 mergedCells.push(currentCellText.trim());
               }
 
-              // Evaluate if this row looks like an estimate/spare parts table line
-              if (mergedCells.length >= 2) {
-                // Check for alphabetic part name representation
-                const hasLetters = mergedCells.some((c) => /[A-Za-z]{3,}/.test(c));
-                
-                // Get valid numeric attributes
-                const numericValues = mergedCells.map((c) => {
-                  const clean = c.replace(/[^0-9.]/g, '');
-                  const val = parseFloat(clean);
-                  return isNaN(val) ? null : val;
-                }).filter((val) => val !== null && val > 0);
+              const joinedStr = mergedCells.join(' ').trim();
+              const isHsnRow = joinedStr.toLowerCase().includes('hsn/sac');
+              const isPriceRow = joinedStr.toLowerCase().includes('unit') || joinedStr.toLowerCase().includes('customer') || joinedStr.toLowerCase().includes('ltr') || joinedStr.toLowerCase().includes('pcs');
+              const isTaxRow = joinedStr.match(/^\d+%\s*$/) || joinedStr.match(/^gst\s*\d+%\s*$/i);
+              
+              // Validate possible serial number prefix in a cell
+              const srMatch = mergedCells[0]?.trim().match(/^(\d+)$/);
 
-                // Exclude corporate headers or summary footer blocks
-                const isHeaderOrFooterLine = mergedCells.some((c) =>
-                  /(?:total|subtotal|grand\s*total|invoice|estimate|tax|summary|surveyor|page|date|mobile|vehicle|customer|honda|maruti|hyundai|byd|tata|mahindra|parts\s*estimate|insurance|job\s*card|contact)/i.test(c)
-                );
+              // 1. Process candidate start
+              if (srMatch) {
+                // Archive preceding candidate
+                saveCurrentItem();
 
-                if (hasLetters && numericValues.length >= 1 && !isHeaderOrFooterLine) {
-                  // Candidate discovered! Gather matching criteria
-                  let sr = tempSrCounter;
-                  const firstCellClean = mergedCells[0].replace(/[^0-9]/g, '');
-                  const potentialSr = parseInt(firstCellClean, 10);
-                  let hasExplicitSr = false;
+                const srNum = parseInt(srMatch[1], 10);
+                currentItem = {
+                  sr: srNum,
+                  partNumber: 'N/A',
+                  partName: '',
+                  qty: 1,
+                  unitCategory: 'PCS',
+                  price: 0,
+                  taxes: 18,
+                  amount: 0
+                };
 
-                  // Check if first column represents the table serial number index
-                  if (/^\d+[\s.)-]*$/.test(mergedCells[0].trim()) && potentialSr > 0 && potentialSr < 500) {
-                    sr = potentialSr;
-                    hasExplicitSr = true;
-                  }
-
-                  let partNumber = 'N/A';
-                  let partName = '';
-                  let qty = 1;
-                  let unitCategory = 'PCS';
-                  let price = 0;
-                  let taxes = 18;
-                  let amount = 0;
-
-                  const cellsToProcess = hasExplicitSr ? mergedCells.slice(1) : mergedCells;
-
-                  // Hunt for a typical alphanumeric spare parts code (letters + numbers, length >= 5)
-                  let partNoIdx = -1;
-                  for (let i = 0; i < Math.min(2, cellsToProcess.length); i++) {
-                    const c = cellsToProcess[i];
-                    if (/[A-Z0-9_\-\/\\]{5,25}/i.test(c) && /[0-9]/.test(c) && /[A-Za-z]/.test(c) && !/^[0-9.,]+$/.test(c)) {
-                      partNoIdx = i;
-                      break;
-                    }
-                  }
-
-                  if (partNoIdx !== -1) {
-                    partNumber = cellsToProcess[partNoIdx];
-                  }
-
-                  // Identify description (the cell with the most letters)
-                  let descIdx = -1;
-                  let maxLetters = -1;
-                  cellsToProcess.forEach((cell, idx) => {
-                    if (idx === partNoIdx) return;
-                    const lettersCount = (cell.match(/[A-Za-z]/g) || []).length;
-                    if (lettersCount > maxLetters) {
-                      maxLetters = lettersCount;
-                      descIdx = idx;
-                    }
-                  });
-
-                  if (descIdx !== -1) {
-                    partName = cellsToProcess[descIdx];
+                // Extract Part number and Part name
+                if (mergedCells.length >= 2) {
+                  const rawCell = mergedCells[1] || '';
+                  const partNo8_2Match = rawCell.match(/^(\d{8}-\d{2})(.*)$/);
+                  if (partNo8_2Match) {
+                    currentItem.partNumber = partNo8_2Match[1];
+                    currentItem.partName = partNo8_2Match[2].trim();
                   } else {
-                    partName = cellsToProcess.find((_, idx) => idx !== partNoIdx) || 'Automotive Component';
-                  }
-
-                  if (!partName || partName.trim() === '') {
-                    partName = 'Automotive Component';
-                  }
-
-                  // Get remaining numeric parameters (Qty, Price, Tax Rate, Amount)
-                  const remainingNumbers: number[] = [];
-                  cellsToProcess.forEach((cell, idx) => {
-                    if (idx === partNoIdx || idx === descIdx) return;
-                    const clean = cell.replace(/[^0-9.]/g, '');
-                    const val = parseFloat(clean);
-                    if (!isNaN(val)) {
-                      remainingNumbers.push(val);
-                    }
-                  });
-
-                  if (remainingNumbers.length === 1) {
-                    price = remainingNumbers[0];
-                    amount = remainingNumbers[0];
-                  } else if (remainingNumbers.length === 2) {
-                    // Small integer represents item quantity
-                    if (remainingNumbers[0] < 12) {
-                      qty = Math.round(remainingNumbers[0]) || 1;
-                      price = remainingNumbers[1];
+                    const firstSpaceIdx = rawCell.search(/\s/);
+                    if (firstSpaceIdx !== -1) {
+                      const firstPart = rawCell.substring(0, firstSpaceIdx).trim();
+                      const secondPart = rawCell.substring(firstSpaceIdx + 1).trim();
+                      if (/[0-9]/.test(firstPart) && firstPart.length >= 5 && !/^[0-9.,]+$/.test(firstPart)) {
+                        currentItem.partNumber = firstPart;
+                        currentItem.partName = secondPart;
+                      } else {
+                        currentItem.partNumber = 'N/A';
+                        currentItem.partName = rawCell;
+                      }
                     } else {
-                      price = remainingNumbers[0];
-                      qty = 1;
-                    }
-                    amount = qty * price;
-                  } else if (remainingNumbers.length >= 3) {
-                    qty = Math.round(remainingNumbers[0]) || 1;
-                    if (qty > 100) qty = 1;
-                    price = remainingNumbers[1];
-
-                    if (remainingNumbers.length >= 4) {
-                      taxes = remainingNumbers[2];
-                      if (taxes > 50) taxes = 18;
-                      amount = remainingNumbers[3];
-                    } else {
-                      amount = remainingNumbers[2];
+                      currentItem.partNumber = 'N/A';
+                      currentItem.partName = rawCell;
                     }
                   }
+                }
 
-                  if (amount === 0) {
-                    amount = Math.round(qty * price * (1 + taxes / 100));
+                // If pricing parameters exist on the same line, extract them immediately
+                const checkPricing = tryParseNumericCell(joinedStr);
+                if (checkPricing) {
+                  currentItem.qty = checkPricing.qty;
+                  currentItem.unitCategory = checkPricing.unitCategory;
+                  currentItem.price = checkPricing.price;
+
+                  const amountMatch = joinedStr.match(/([\d,.]+)\s*(?:₹|INR)?\s*$/i);
+                  if (amountMatch) {
+                    currentItem.amount = parseFloat(amountMatch[1].replace(/,/g, ''));
+                  }
+                }
+              } else if (currentItem) {
+                // Secondary / supplemental row mapping state machine
+                if (isHsnRow) {
+                  // Capture tax rate if declared on HSN line
+                  const taxMatch = joinedStr.match(/(\d+)%/);
+                  if (taxMatch) {
+                    currentItem.taxes = parseInt(taxMatch[1], 10);
+                  }
+                } else if (isPriceRow) {
+                  const pricing = tryParseNumericCell(joinedStr);
+                  if (pricing) {
+                    currentItem.qty = pricing.qty;
+                    currentItem.unitCategory = pricing.unitCategory;
+                    currentItem.price = pricing.price;
                   }
 
-                  extractedItems.push({
-                    id: Math.random().toString(36).substring(2, 9),
-                    sr,
-                    partNumber: partNumber.trim(),
-                    partName: partName.trim(),
-                    status: '✔️APPROVED',
-                    qty,
-                    unitCategory: unitCategory.trim(),
-                    price,
-                    taxes,
-                    amount,
-                  });
-
-                  tempSrCounter++;
+                  const amountMatch = joinedStr.match(/([\d,.]+)\s*(?:₹|INR)?\s*$/i);
+                  if (amountMatch) {
+                    currentItem.amount = parseFloat(amountMatch[1].replace(/,/g, ''));
+                  }
+                } else if (isTaxRow) {
+                  const taxMatch = joinedStr.match(/(\d+)/);
+                  if (taxMatch) {
+                    currentItem.taxes = parseInt(taxMatch[1], 10);
+                  }
+                } else {
+                  // Wrapped description continuation row
+                  const isNoise = joinedStr.match(/(?:spares\s*estimate|customer\s*&\s*vehicle|demanded\s*repair|accidenatal\s*repair|registered\s*name|office\s*add|gstin|email|page:\s*\d+|kristan|service\s*cost)/i);
+                  if (!isNoise && joinedStr.replace(/[^A-Za-z]/g, '').length > 2) {
+                    currentItem.partName += (currentItem.partName ? ' ' : '') + joinedStr;
+                  }
                 }
               }
             });
           }
+
+          // Save final active candidate if any remains
+          saveCurrentItem();
 
           // Post-processing sweep on fullCombinedText for high-accuracy fields extraction
           const cleanTextForParsing = fullCombinedText.replace(/\s+/g, ' ');
