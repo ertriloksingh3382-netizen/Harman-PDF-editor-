@@ -1,0 +1,6 @@
+{
+  "name": "Harman PDF Editor",
+  "description": "An advanced client-side PDF editor and smart estimation system configured with HARMAN AUTO BOT v3.0 quotation tools.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
