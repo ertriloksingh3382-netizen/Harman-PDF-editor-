@@ -60,3 +60,43 @@ export interface EstimationDetails {
   surveyorName?: string;
 }
 
+export interface PartOrder {
+  id: string;
+  regNo: string;
+  partNo?: string;
+  partName: string;
+  orderNo?: string;
+  orderDate?: string;
+  qty: number;
+  status: 'In Order' | 'In Transit' | 'Received';
+  eta?: string;
+  isSupplementary?: boolean;
+  rate?: number;
+  insuranceStatus?: 'Pending' | 'Approved' | 'Rejected';
+  remarks?: string;
+  updatedAt?: number;
+  isDeleted?: boolean;
+}
+
+export interface User {
+  canWrite: boolean;
+  canDelete: boolean;
+}
+
+export interface Vehicle {
+  id: string;
+  regNo: string;
+  customer: string;
+  jc: string;
+  status: string;
+  isDeleted?: boolean;
+}
+
+export interface PartsMasterItem {
+  id: string;
+  partNo: string;
+  partName: string;
+  price: number;
+}
+
+
