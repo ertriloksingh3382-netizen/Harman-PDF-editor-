@@ -97,25 +97,25 @@ export async function exportModifiedPdf(
         textWidth = edit.text.length * (fontSizePdf * 0.55);
       }
 
-      // Check if background masking is active (not set to transparent)
-      if (edit.backgroundColor !== 'transparent') {
-        const maskColor = hexToPdfRgb(edit.backgroundColor);
-        
-        // Define bounding box to cover the text nicely (bottom-left coordinate space)
-        // Shifting bottom bounds (y) down by 20% of font size to mask characters descenders fully
-        const maskX = xPdf - 2;
-        const maskY = yPdf - (fontSizePdf * 0.22);
-        const maskWidth = Math.max(originalWidth, textWidth) + 4;
-        const maskHeight = Math.max(originalHeight, fontSizePdf) * 1.25;
+      // Always draw a masking rectangle to cover and erase the original text underneath.
+      // Default to white (#FFFFFF) if specified as transparent or undefined.
+      const bgToUse = !edit.backgroundColor || edit.backgroundColor === 'transparent' ? '#FFFFFF' : edit.backgroundColor;
+      const maskColor = hexToPdfRgb(bgToUse);
+      
+      // Define bounding box to cover the text nicely (bottom-left coordinate space)
+      // Shifting bottom bounds (y) down by 22% of font size to mask character descenders fully
+      const maskX = xPdf - 2;
+      const maskY = yPdf - (fontSizePdf * 0.22);
+      const maskWidth = Math.max(originalWidth, textWidth) + 4;
+      const maskHeight = Math.max(originalHeight, fontSizePdf) * 1.25;
 
-        page.drawRectangle({
-          x: maskX,
-          y: maskY,
-          width: maskWidth,
-          height: maskHeight,
-          color: maskColor,
-        });
-      }
+      page.drawRectangle({
+        x: maskX,
+        y: maskY,
+        width: maskWidth,
+        height: maskHeight,
+        color: maskColor,
+      });
 
       // Draw the new edited text on top
       const textColor = hexToPdfRgb(edit.textColor);

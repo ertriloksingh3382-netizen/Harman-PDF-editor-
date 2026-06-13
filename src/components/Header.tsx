@@ -23,9 +23,9 @@ import {
 interface HeaderProps {
   fileName: string | null;
   mode: 'view' | 'edit';
-  setMode: (mode: 'view' | 'edit') => void;
-  zoom: number;
   setZoom: (zoom: number) => void;
+  zoom: number;
+  setMode: (mode: 'view' | 'edit') => void;
   onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onDownload: () => void;
   onLoadSample: () => void;
@@ -37,6 +37,7 @@ interface HeaderProps {
   onUndo: () => void;
   onRedo: () => void;
   onPrint: () => void;
+  onGoToDashboard?: () => void;
 }
 
 export default function Header({
@@ -55,7 +56,8 @@ export default function Header({
   canRedo,
   onUndo,
   onRedo,
-  onPrint
+  onPrint,
+  onGoToDashboard
 }: HeaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -76,12 +78,16 @@ export default function Header({
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
         
         {/* Brand Logo & Loaded File Info */}
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold select-none text-sm leading-none shrink-0" id="header_symbol_badge">
+        <div 
+          className={`flex items-center gap-3 ${onGoToDashboard ? 'cursor-pointer hover:opacity-90 select-none group/logo' : ''}`}
+          onClick={onGoToDashboard}
+          title="Return to All PDF Tools Dashboard"
+        >
+          <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold select-none text-sm leading-none shrink-0 group-hover/logo:scale-102 transition" id="header_symbol_badge">
             H
           </div>
           <div>
-            <h1 className="font-sans font-bold tracking-tight text-base text-gray-800 flex items-center gap-1.5">
+            <h1 className="font-sans font-bold tracking-tight text-base text-gray-800 flex items-center gap-1.5 group-hover/logo:text-blue-600 transition">
               Harman PDF Editor
               <span className="text-[10px] font-mono tracking-widest bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100 font-bold">PRO</span>
             </h1>

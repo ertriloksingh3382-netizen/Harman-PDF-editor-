@@ -54,6 +54,8 @@ interface PdfToolsPanelProps {
   setIsProcessing: (loading: boolean) => void;
   onDownload?: () => void;
   onPrint?: () => void;
+  propActiveTab?: 'convert' | 'utilities' | 'organize' | 'ai';
+  propSetActiveTab?: (tab: 'convert' | 'utilities' | 'organize' | 'ai') => void;
 }
 
 export default function PdfToolsPanel({
@@ -65,10 +67,15 @@ export default function PdfToolsPanel({
   isProcessing,
   setIsProcessing,
   onDownload,
-  onPrint
+  onPrint,
+  propActiveTab,
+  propSetActiveTab
 }: PdfToolsPanelProps) {
   const [isOpen, setIsOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<'convert' | 'utilities' | 'organize' | 'ai'>('convert');
+  const [localActiveTab, setLocalActiveTab] = useState<'convert' | 'utilities' | 'organize' | 'ai'>('convert');
+
+  const activeTab = propActiveTab || localActiveTab;
+  const setActiveTab = propSetActiveTab || setLocalActiveTab;
   
   // Custom ILovePDF advanced state hooks
   const [splitRange, setSplitRange] = useState('1');

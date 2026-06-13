@@ -65,6 +65,26 @@ export default function PdfWorkspace({
   const [editingIsItalic, setEditingIsItalic] = useState(false);
   const [activeEditingBlock, setActiveEditingBlock] = useState<PdfTextBlock | null>(null);
 
+  const editingTextRef = useRef(editingText);
+  const editingFontSizeRef = useRef(editingFontSize);
+  const editingFontFamilyRef = useRef(editingFontFamily);
+  const editingTextColorRef = useRef(editingTextColor);
+  const editingBackgroundColorRef = useRef(editingBackgroundColor);
+  const editingIsBoldRef = useRef(editingIsBold);
+  const editingIsItalicRef = useRef(editingIsItalic);
+  const editingBlockIdRef = useRef(editingBlockId);
+  const activeEditingBlockRef = useRef(activeEditingBlock);
+
+  useEffect(() => { editingTextRef.current = editingText; }, [editingText]);
+  useEffect(() => { editingFontSizeRef.current = editingFontSize; }, [editingFontSize]);
+  useEffect(() => { editingFontFamilyRef.current = editingFontFamily; }, [editingFontFamily]);
+  useEffect(() => { editingTextColorRef.current = editingTextColor; }, [editingTextColor]);
+  useEffect(() => { editingBackgroundColorRef.current = editingBackgroundColor; }, [editingBackgroundColor]);
+  useEffect(() => { editingIsBoldRef.current = editingIsBold; }, [editingIsBold]);
+  useEffect(() => { editingIsItalicRef.current = editingIsItalic; }, [editingIsItalic]);
+  useEffect(() => { editingBlockIdRef.current = editingBlockId; }, [editingBlockId]);
+  useEffect(() => { activeEditingBlockRef.current = activeEditingBlock; }, [activeEditingBlock]);
+
   // Trigger inline config when blocks get double clicked or single clicked
   const startInlineEdit = (block: PdfTextBlock) => {
     const pageEdits = edits[currentPage] || {};
@@ -72,6 +92,9 @@ export default function PdfWorkspace({
     
     setEditingBlockId(block.id);
     setActiveEditingBlock(block);
+    
+    editingBlockIdRef.current = block.id;
+    activeEditingBlockRef.current = block;
     
     if (existingEdit) {
       setEditingText(existingEdit.text);
@@ -81,49 +104,72 @@ export default function PdfWorkspace({
       setEditingBackgroundColor(existingEdit.backgroundColor);
       setEditingIsBold(existingEdit.isBold);
       setEditingIsItalic(existingEdit.isItalic);
+
+      editingTextRef.current = existingEdit.text;
+      editingFontSizeRef.current = existingEdit.fontSize;
+      editingFontFamilyRef.current = existingEdit.fontFamily;
+      editingTextColorRef.current = existingEdit.textColor;
+      editingBackgroundColorRef.current = existingEdit.backgroundColor;
+      editingIsBoldRef.current = existingEdit.isBold;
+      editingIsItalicRef.current = existingEdit.isItalic;
     } else {
       setEditingText(block.text);
       setEditingFontSize(block.fontSize);
-      setEditingFontFamily(
-        block.fontFamily.toLowerCase().includes('times') || block.fontFamily.toLowerCase().includes('roman')
-          ? 'Times'
-          : block.fontFamily.toLowerCase().includes('courier') || block.fontFamily.toLowerCase().includes('mono')
-            ? 'Courier'
-            : 'Helvetica'
-      );
+      
+      const family = block.fontFamily.toLowerCase().includes('times') || block.fontFamily.toLowerCase().includes('roman')
+        ? 'Times'
+        : block.fontFamily.toLowerCase().includes('courier') || block.fontFamily.toLowerCase().includes('mono')
+          ? 'Courier'
+          : 'Helvetica';
+      
+      setEditingFontFamily(family);
       setEditingTextColor('#000000');
-      setEditingBackgroundColor('transparent');
+      setEditingBackgroundColor('#FFFFFF'); // Default to solid white background to cover canvas original beneath
       setEditingIsBold(false);
       setEditingIsItalic(false);
+
+      editingTextRef.current = block.text;
+      editingFontSizeRef.current = block.fontSize;
+      editingFontFamilyRef.current = family;
+      editingTextColorRef.current = '#000000';
+      editingBackgroundColorRef.current = '#FFFFFF';
+      editingIsBoldRef.current = false;
+      editingIsItalicRef.current = false;
     }
   };
 
   const saveInlineChange = () => {
-    if (!editingBlockId || !activeEditingBlock) return;
+    const activeBlock = activeEditingBlockRef.current;
+    const blockId = editingBlockIdRef.current;
+    if (!blockId || !activeBlock) return;
     
     const modifiedEdit: PdfEdit = {
-      text: editingText,
-      fontSize: editingFontSize,
-      fontFamily: editingFontFamily,
-      textColor: editingTextColor,
-      backgroundColor: editingBackgroundColor,
-      isBold: editingIsBold,
-      isItalic: editingIsItalic
+      text: editingTextRef.current,
+      fontSize: editingFontSizeRef.current,
+      fontFamily: editingFontFamilyRef.current,
+      textColor: editingTextColorRef.current,
+      backgroundColor: editingBackgroundColorRef.current,
+      isBold: editingIsBoldRef.current,
+      isItalic: editingIsItalicRef.current
     };
     
     if (onSaveInlineEdit) {
-      onSaveInlineEdit(activeEditingBlock, modifiedEdit);
+      onSaveInlineEdit(activeBlock, modifiedEdit);
     } else {
-      onEditBlock(activeEditingBlock);
+      onEditBlock(activeBlock);
     }
     
     setEditingBlockId(null);
     setActiveEditingBlock(null);
+    editingBlockIdRef.current = null;
+    activeEditingBlockRef.current = null;
   };
 
   const cancelInlineChange = () => {
     setEditingBlockId(null);
     setActiveEditingBlock(null);
+    editingBlockIdRef.current = null;
+    activeEditingBlockRef.current = null;
   };
 
   // Render the PDF page canvas and parse text blocks
@@ -372,6 +418,10 @@ export default function PdfWorkspace({
                       autoFocus
                       value={editingText}
                       onChange={(e) => setEditingText(e.target.value)}
+                      onBlur={() => {
+                        // Delay slightly so that Clicking "Cancel" or "Apply" button can dismiss the state first
+                        setTimeout(saveInlineChange, 150);
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
@@ -511,7 +561,7 @@ export default function PdfWorkspace({
                     mode === 'edit'
                       ? 'cursor-pointer hover:bg-blue-50/50 hover:ring-1 hover:ring-blue-400 hover:shadow-xs hover:z-30 rounded-xs'
                       : ''
-                  } ${isEdited ? 'shadow-xs border border-emerald-500/10' : ''}`}
+                  } ${isEdited ? 'border border-emerald-500/10' : ''}`}
                   style={{
                     left: coords.left,
                     top: coords.top,
@@ -521,8 +571,10 @@ export default function PdfWorkspace({
                     fontWeight: editObj ? (editObj.isBold ? 'bold' : 'normal') : 'normal',
                     fontStyle: editObj ? (editObj.isItalic ? 'italic' : 'normal') : 'normal',
                     color: editObj ? editObj.textColor : 'rgba(0, 0, 0, 0.04)', // Slight opacity for invisible text selection overlay when unedited
-                    backgroundColor: editObj ? editObj.backgroundColor : 'transparent',
-                    textShadow: editObj ? 'none' : 'none',
+                    backgroundColor: editObj 
+                      ? (editObj.backgroundColor === 'transparent' ? '#FFFFFF' : editObj.backgroundColor) 
+                      : 'transparent',
+                    textShadow: 'none',
                     padding: '0 2px',
                     whiteSpace: 'nowrap',
                     overflow: 'visible'

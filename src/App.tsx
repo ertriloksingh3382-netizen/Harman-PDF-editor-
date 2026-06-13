@@ -12,7 +12,37 @@ import {
   Files, 
   HelpCircle,
   TrendingUp,
-  Cpu
+  Cpu,
+  Layers,
+  Scissors,
+  Minimize2,
+  FileText,
+  Presentation,
+  FileSpreadsheet,
+  FilePenLine,
+  Image,
+  PenTool,
+  RotateCw,
+  Code,
+  Unlock,
+  Lock,
+  LayoutGrid,
+  BookOpen,
+  Wrench,
+  Hash,
+  Scan,
+  FileSearch,
+  Eye,
+  Trash2,
+  Undo2,
+  Redo2,
+  Printer,
+  ChevronRight,
+  ArrowRight,
+  Sparkle,
+  History,
+  X,
+  Copyright
 } from 'lucide-react';
 
 import Header from './components/Header';
@@ -28,9 +58,309 @@ import { PdfTextBlock, PdfEdit, AllEdits, PartOrder, User, Vehicle, PartsMasterI
 import { generateSamplePdf } from './utils/pdfGenerator';
 import { exportModifiedPdf } from './utils/pdfModifier';
 
+const ALL_PDF_TOOLS = [
+  {
+    id: 'merge',
+    title: 'Merge PDF',
+    desc: 'Combine PDFs in the order you want with the easiest PDF merger available.',
+    icon: Layers,
+    color: 'text-orange-600',
+    bgColor: 'bg-orange-50',
+    badgeColor: 'bg-orange-500/10 text-orange-600',
+    category: 'organize',
+    panelTab: 'organize' as const
+  },
+  {
+    id: 'split',
+    title: 'Split PDF',
+    desc: 'Separate one page or a whole set for easy conversion into independent PDF files.',
+    icon: Scissors,
+    color: 'text-orange-600',
+    bgColor: 'bg-orange-50',
+    badgeColor: 'bg-orange-500/10 text-orange-600',
+    category: 'organize',
+    panelTab: 'organize' as const
+  },
+  {
+    id: 'compress',
+    title: 'Compress PDF',
+    desc: 'Reduce file size while optimizing for maximal PDF quality.',
+    icon: Minimize2,
+    color: 'text-emerald-500',
+    bgColor: 'bg-emerald-50',
+    badgeColor: 'bg-emerald-500/10 text-emerald-600',
+    category: 'optimize',
+    panelTab: 'utilities' as const
+  },
+  {
+    id: 'pdf-to-word',
+    title: 'PDF to Word',
+    desc: 'Easily convert your PDF files into easy to edit DOC and DOCX documents with almost 100% accuracy.',
+    icon: FileText,
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-50',
+    badgeColor: 'bg-blue-500/10 text-blue-600',
+    category: 'convert',
+    panelTab: 'convert' as const
+  },
+  {
+    id: 'pdf-to-ppt',
+    title: 'PDF to PowerPoint',
+    desc: 'Turn your PDF files into easy to edit PPT and PPTX slideshows.',
+    icon: Presentation,
+    color: 'text-orange-500',
+    bgColor: 'bg-orange-50/50',
+    badgeColor: 'bg-orange-500/10 text-orange-600',
+    category: 'convert',
+    panelTab: 'convert' as const
+  },
+  {
+    id: 'pdf-to-excel',
+    title: 'PDF to Excel',
+    desc: 'Pull data straight from PDFs into Excel spreadsheets in a few short seconds.',
+    icon: FileSpreadsheet,
+    color: 'text-emerald-500',
+    bgColor: 'bg-emerald-50/50',
+    badgeColor: 'bg-emerald-500/10 text-emerald-600',
+    category: 'convert',
+    panelTab: 'convert' as const
+  },
+  {
+    id: 'word-to-pdf',
+    title: 'Word to PDF',
+    desc: 'Make DOC and DOCX files easy to read by converting them to PDF.',
+    icon: FileText,
+    color: 'text-blue-500',
+    bgColor: 'bg-blue-50/50',
+    badgeColor: 'bg-blue-500/10 text-blue-600',
+    category: 'convert',
+    panelTab: 'convert' as const
+  },
+  {
+    id: 'ppt-to-pdf',
+    title: 'PowerPoint to PDF',
+    desc: 'Make PPT and PPTX slideshows easy to view by converting them to PDF.',
+    icon: Presentation,
+    color: 'text-orange-600',
+    bgColor: 'bg-orange-50/85',
+    badgeColor: 'bg-orange-500/10 text-orange-600',
+    category: 'convert',
+    panelTab: 'convert' as const
+  },
+  {
+    id: 'excel-to-pdf',
+    title: 'Excel to PDF',
+    desc: 'Make EXCEL spreadsheets easy to read by converting them to PDF.',
+    icon: FileSpreadsheet,
+    color: 'text-emerald-500',
+    bgColor: 'bg-emerald-50/85',
+    badgeColor: 'bg-emerald-500/10 text-emerald-600',
+    category: 'convert',
+    panelTab: 'convert' as const
+  },
+  {
+    id: 'edit-pdf',
+    title: 'Edit PDF',
+    desc: 'Add text, images, shapes or freehand annotations directly to your PDF document pages.',
+    icon: FilePenLine,
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-50',
+    badgeColor: 'bg-purple-500/10 text-purple-600',
+    category: 'edit',
+    panelTab: 'utilities' as const,
+    editorMode: 'edit' as const
+  },
+  {
+    id: 'pdf-to-jpg',
+    title: 'PDF to JPG',
+    desc: 'Convert each PDF page into a high resolution JPG or extract all images contained inside.',
+    icon: Image,
+    color: 'text-yellow-600',
+    bgColor: 'bg-yellow-50',
+    badgeColor: 'bg-yellow-500/10 text-yellow-600',
+    category: 'convert',
+    panelTab: 'convert' as const
+  },
+  {
+    id: 'jpg-to-pdf',
+    title: 'JPG to PDF',
+    desc: 'Convert JPG or PNG images to PDF in seconds. Easily adjust orientation and margins.',
+    icon: Image,
+    color: 'text-yellow-500',
+    bgColor: 'bg-yellow-50/50',
+    badgeColor: 'bg-yellow-500/10 text-yellow-600',
+    category: 'convert',
+    panelTab: 'convert' as const
+  },
+  {
+    id: 'sign-pdf',
+    title: 'Sign PDF',
+    desc: 'Add secure signatures to your documents or request electronic signing validations.',
+    icon: PenTool,
+    color: 'text-sky-600',
+    bgColor: 'bg-sky-50',
+    badgeColor: 'bg-sky-500/10 text-sky-600',
+    category: 'security',
+    panelTab: 'utilities' as const
+  },
+  {
+    id: 'watermark',
+    title: 'Watermark',
+    desc: 'Stamp a customizable text banner or logo image over your PDF pages in real-time.',
+    icon: Copyright,
+    color: 'text-purple-500',
+    bgColor: 'bg-purple-50/50',
+    badgeColor: 'bg-purple-500/10 text-purple-600',
+    category: 'edit',
+    panelTab: 'utilities' as const
+  },
+  {
+    id: 'rotate-pdf',
+    title: 'Rotate PDF',
+    desc: 'Rotate your PDFs the way you need. Support batch rotating multiple pages at once.',
+    icon: RotateCw,
+    color: 'text-pink-600',
+    bgColor: 'bg-pink-50',
+    badgeColor: 'bg-pink-500/10 text-pink-600',
+    category: 'edit',
+    panelTab: 'utilities' as const
+  },
+  {
+    id: 'html-to-pdf',
+    title: 'HTML to PDF',
+    desc: 'Convert webpages in HTML to secure PDF. Just copy, paste the URL and convert.',
+    icon: Code,
+    color: 'text-red-500',
+    bgColor: 'bg-red-50',
+    badgeColor: 'bg-red-500/10 text-red-600',
+    category: 'convert',
+    panelTab: 'convert' as const
+  },
+  {
+    id: 'unlock-pdf',
+    title: 'Unlock PDF',
+    desc: 'Strip secure passkeys or passwords from PDF to view and print freely.',
+    icon: Unlock,
+    color: 'text-teal-650',
+    bgColor: 'bg-teal-50',
+    badgeColor: 'bg-teal-500/10 text-teal-650',
+    category: 'security',
+    panelTab: 'utilities' as const
+  },
+  {
+    id: 'protect-pdf',
+    title: 'Protect PDF',
+    desc: 'Protect PDF files with strong passwords. Encrypt content to secure against third parties.',
+    icon: Lock,
+    color: 'text-teal-600',
+    bgColor: 'bg-teal-50',
+    badgeColor: 'bg-teal-500/10 text-teal-600',
+    category: 'security',
+    panelTab: 'utilities' as const
+  },
+  {
+    id: 'organize-pdf',
+    title: 'Organize PDF',
+    desc: 'Sort, re-align, add or permanently delete selected layout pages.',
+    icon: LayoutGrid,
+    color: 'text-rose-600',
+    bgColor: 'bg-rose-50',
+    badgeColor: 'bg-rose-500/10 text-rose-600',
+    category: 'organize',
+    panelTab: 'organize' as const
+  },
+  {
+    id: 'pdf-to-pdfa',
+    title: 'PDF to PDF/A',
+    desc: 'Transform your PDF onto ISO-standardized PDF/A structure for absolute long-term archiving.',
+    icon: BookOpen,
+    color: 'text-blue-500',
+    bgColor: 'bg-blue-50',
+    badgeColor: 'bg-blue-500/10 text-blue-600',
+    category: 'convert',
+    panelTab: 'convert' as const
+  },
+  {
+    id: 'repair-pdf',
+    title: 'Repair PDF',
+    desc: 'Heal corrupted or partially damaged PDF byte structures instantly.',
+    icon: Wrench,
+    color: 'text-green-500',
+    bgColor: 'bg-green-50/70',
+    badgeColor: 'bg-green-500/10 text-green-600',
+    category: 'optimize',
+    panelTab: 'utilities' as const
+  },
+  {
+    id: 'page-numbers',
+    title: 'Page Numbers',
+    desc: 'Add beautifully customized numeric labels to footers or headers of your pages automatically.',
+    icon: Hash,
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-50/80',
+    badgeColor: 'bg-purple-500/10 text-purple-600',
+    category: 'edit',
+    panelTab: 'utilities' as const
+  },
+  {
+    id: 'scan-pdf',
+    title: 'Scan to PDF',
+    desc: 'Import scans from local file buffers and convert them to formatted PDF sheets.',
+    icon: Scan,
+    color: 'text-violet-650',
+    bgColor: 'bg-violet-50',
+    badgeColor: 'bg-violet-500/10 text-violet-600',
+    category: 'organize',
+    panelTab: 'organize' as const
+  },
+  {
+    id: 'ocr-pdf',
+    title: 'OCR PDF',
+    desc: 'Extract textual information from images or scanned PDF sheets instantly.',
+    icon: FileSearch,
+    color: 'text-green-600',
+    bgColor: 'bg-green-50',
+    badgeColor: 'bg-green-500/10 text-green-600',
+    category: 'optimize',
+    panelTab: 'ai' as const
+  },
+  {
+    id: 'ai-summarizer',
+    title: 'AI Summarizer',
+    desc: 'Use advanced server-side Gemini intelligence to generate multi-perspective summaries & insights.',
+    icon: Sparkle,
+    color: 'text-indigo-600',
+    bgColor: 'bg-indigo-50',
+    badgeColor: 'bg-indigo-500/10 text-indigo-600',
+    category: 'intelligence',
+    panelTab: 'ai' as const
+  },
+  {
+    id: 'translate-pdf',
+    title: 'Translate PDF',
+    desc: 'Instantly translate text segments inside your document workspace utilizing native translation bridges.',
+    icon: History,
+    color: 'text-indigo-500',
+    bgColor: 'bg-indigo-50/40',
+    badgeColor: 'bg-indigo-500/10 text-indigo-600',
+    category: 'intelligence',
+    panelTab: 'ai' as const
+  }
+];
+
 export default function App() {
   // Navigation tabs
-  const [activeView, setActiveView] = useState<'editor' | 'estimation' | 'supplementary'>('editor');
+  const [activeView, setActiveView] = useState<'dashboard' | 'editor' | 'estimation' | 'supplementary'>('dashboard');
+
+  // Controlled active tab state inside PdfToolsPanel
+  const [toolsActiveTab, setToolsActiveTab] = useState<'convert' | 'utilities' | 'organize' | 'ai'>('convert');
+
+  // Active selected tool for prompt modal details
+  const [selectedToolForModal, setSelectedToolForModal] = useState<any | null>(null);
+
+  // Dashboard category filter and search query
+  const [dashboardSearchQuery, setDashboardSearchQuery] = useState('');
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>('all');
 
   // Supplementary Section States
   const [parts, setParts] = useState<PartOrder[]>(() => {
@@ -494,6 +824,7 @@ export default function App() {
         onUndo={handleUndo}
         onRedo={handleRedo}
         onPrint={handlePrint}
+        onGoToDashboard={() => setActiveView('dashboard')}
       />
 
       {/* View routing selector bar */}
@@ -538,7 +869,127 @@ export default function App() {
       {/* Main Sandbox Workspace Layout */}
       <div className="flex-1 flex overflow-hidden">
         
-        {activeView === 'supplementary' ? (
+        {activeView === 'dashboard' ? (
+          <div className="flex-1 bg-slate-50 overflow-y-auto px-4 py-8 md:px-8 relative select-none flex flex-col" id="dashboard_panel">
+            {/* Ambient Background Glow Decoration */}
+            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-100 rounded-full mix-blend-multiply filter blur-3xl opacity-15 animate-pulse pointer-events-none" />
+            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-amber-100 rounded-full mix-blend-multiply filter blur-3xl opacity-15 pointer-events-none" />
+
+            <div className="max-w-7xl mx-auto w-full z-10 space-y-8 flex-1 flex flex-col">
+              
+              {/* Promo Header Section */}
+              <div className="text-center space-y-3 max-w-2xl mx-auto mt-4">
+                <h2 className="font-sans font-extrabold text-3xl md:text-4xl text-gray-900 tracking-tight leading-none bg-linear-to-r from-blue-700 via-indigo-650 to-rose-600 bg-clip-text text-transparent">
+                  Harman PDF Multi-Toolbox
+                </h2>
+                <p className="text-sm text-slate-500 font-medium leading-relaxed max-w-xl mx-auto">
+                  Every single tool you need to edit, convert, compress, sign, and organize vector-accurate PDF documents easily. Try our AI summaries, translations, or loading local demo quotes instantly.
+                </p>
+              </div>
+
+              {/* Utility Filter & Search Bar */}
+              <div className="bg-white p-4 rounded-2xl shadow-xs border border-gray-150 flex flex-col md:flex-row gap-4 items-center justify-between">
+                
+                {/* Search Input Container */}
+                <div className="relative w-full md:w-80">
+                  <input
+                    type="text"
+                    placeholder="Search for tools... (e.g. Merge, Word)"
+                    value={dashboardSearchQuery}
+                    onChange={(e) => setDashboardSearchQuery(e.target.value)}
+                    className="w-full text-xs font-sans text-gray-750 placeholder-gray-405 bg-gray-50 border border-gray-200 rounded-xl py-2.5 pl-3.5 pr-8 focus:ring-2 focus:ring-blue-100 outline-none transition"
+                  />
+                  {dashboardSearchQuery && (
+                    <button 
+                      onClick={() => setDashboardSearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Category Tags Layout */}
+                <div className="flex flex-wrap items-center gap-1.5 justify-center md:justify-end w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+                  {[
+                    { id: 'all', label: 'All Tools' },
+                    { id: 'organize', label: 'Organize' },
+                    { id: 'optimize', label: 'Optimize' },
+                    { id: 'convert', label: 'Convert' },
+                    { id: 'edit', label: 'Edit' },
+                    { id: 'security', label: 'Security' },
+                    { id: 'intelligence', label: 'AI Intelligence' }
+                  ].map(cat => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setActiveCategoryFilter(cat.id)}
+                      className={`px-3.5 py-1.5 rounded-lg text-[10.5px] font-bold tracking-tight transition cursor-pointer ${
+                        activeCategoryFilter === cat.id
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200/70 hover:text-gray-900'
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Grid of Tools Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-12">
+                {ALL_PDF_TOOLS.filter(tool => {
+                  const matchQuery = tool.title.toLowerCase().includes(dashboardSearchQuery.toLowerCase()) || 
+                                     tool.desc.toLowerCase().includes(dashboardSearchQuery.toLowerCase());
+                  const matchCategory = activeCategoryFilter === 'all' || tool.category === activeCategoryFilter;
+                  return matchQuery && matchCategory;
+                }).map(tool => {
+                  const IconComp = tool.icon;
+                  return (
+                    <div
+                      key={tool.id}
+                      onClick={() => {
+                        if (pdfDoc) {
+                          setToolsActiveTab(tool.panelTab);
+                          if (tool.editorMode) {
+                            setMode(tool.editorMode);
+                          }
+                          setActiveView('editor');
+                        } else {
+                          setSelectedToolForModal(tool);
+                        }
+                      }}
+                      className="group bg-white rounded-2xl border border-gray-150 p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md hover:border-blue-400/50 hover:scale-[1.01] transition-all duration-200 cursor-pointer flex flex-col justify-between min-h-[170px]"
+                    >
+                      <div className="space-y-3">
+                        <div className={`w-10 h-10 ${tool.bgColor} ${tool.color} rounded-xl flex items-center justify-center shadow-2xs`}>
+                          <IconComp className="w-5 h-5 stroke-[1.75]" />
+                        </div>
+                        <div className="space-y-1">
+                          <h3 className="font-sans font-bold text-sm text-gray-800 tracking-tight group-hover:text-blue-600 transition">
+                            {tool.title}
+                          </h3>
+                          <p className="text-[10.5px] text-gray-400 font-medium leading-normal line-clamp-3">
+                            {tool.desc}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-3 mt-1.5 border-t border-gray-100">
+                        <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${tool.badgeColor}`}>
+                          {tool.category}
+                        </span>
+                        <span className="text-gray-300 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all">
+                          <ArrowRight className="w-3.5 h-3.5 stroke-[2]" />
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+            </div>
+          </div>
+        ) : activeView === 'supplementary' ? (
           <div className="flex-1 bg-[#0a0c16] text-slate-200 overflow-y-auto p-6">
             <SupplementarySection
               parts={parts}
@@ -583,6 +1034,8 @@ export default function App() {
               setIsProcessing={setIsProcessing}
               onDownload={handleDownload}
               onPrint={handlePrint}
+              propActiveTab={toolsActiveTab}
+              propSetActiveTab={setToolsActiveTab}
             />
           </>
         ) : (
@@ -709,6 +1162,87 @@ export default function App() {
           onSave={handleSaveBlockEdit}
           onCancel={() => setSelectedBlockForEdit(null)}
         />
+      )}
+
+      {/* Interactive Tool Launcher Popover Modal */}
+      {selectedToolForModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-md w-full overflow-hidden animate-in fade-in-50 duration-200">
+            
+            {/* Modal Header bar */}
+            <div className="bg-slate-50 border-b border-gray-150 p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={`w-7 h-7 rounded-lg ${selectedToolForModal.bgColor} ${selectedToolForModal.color} flex items-center justify-center`}>
+                  {React.createElement(selectedToolForModal.icon, { className: 'w-4 h-4' })}
+                </div>
+                <h3 className="font-sans font-bold text-xs text-gray-800 tracking-tight">
+                  Start {selectedToolForModal.title}
+                </h3>
+              </div>
+              <button
+                onClick={() => setSelectedToolForModal(null)}
+                className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 space-y-4">
+              <div className="space-y-1">
+                <p className="text-[10.5px] text-gray-500 font-medium leading-relaxed">
+                  {selectedToolForModal.desc}
+                </p>
+                <p className="text-[9.5px] text-gray-400 font-medium leading-relaxed italic">
+                  To get started, browse/upload a local PDF file, or load our vector-perfect Harman demo quote immediately.
+                </p>
+              </div>
+
+              {/* Upload Drop Area */}
+              <div 
+                className="border-2 border-dashed border-gray-200 hover:border-blue-400 hover:bg-blue-50/20 active:bg-blue-50/40 rounded-xl p-6 flex flex-col items-center justify-center gap-2 transition cursor-pointer relative"
+              >
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) => {
+                    handleFileUpload(e);
+                    // Match the tool panel tab to what was clicked from dashboard
+                    setToolsActiveTab(selectedToolForModal.panelTab);
+                    if (selectedToolForModal.editorMode) {
+                      setMode(selectedToolForModal.editorMode);
+                    }
+                    setSelectedToolForModal(null);
+                    setActiveView('editor');
+                  }}
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                />
+                <FileUp className="w-7 h-7 text-gray-400" />
+                <span className="text-[10.5px] font-bold text-gray-700">Browse Local PDF File</span>
+                <span className="text-[9px] text-gray-450">PDF documents only</span>
+              </div>
+
+              {/* Loader/Demo Button */}
+              <button
+                onClick={() => {
+                  handleLoadSample();
+                  // Match the tool panel tab to what was clicked from dashboard
+                  setToolsActiveTab(selectedToolForModal.panelTab);
+                  if (selectedToolForModal.editorMode) {
+                    setMode(selectedToolForModal.editorMode);
+                  }
+                  setSelectedToolForModal(null);
+                  setActiveView('editor');
+                }}
+                className="w-full flex items-center justify-center gap-1.5 py-2 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl text-[10.5px] font-bold shadow-xs transition cursor-pointer"
+              >
+                <Sparkle className="w-3.5 h-3.5 text-blue-200" />
+                Try with Demo Document
+              </button>
+            </div>
+
+          </div>
+        </div>
       )}
 
     </div>

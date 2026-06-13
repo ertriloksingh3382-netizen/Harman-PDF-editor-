@@ -198,6 +198,91 @@ export default function PdfEstimation() {
           let tempSrCounter = 1;
           let currentItem: any = null;
 
+          // Dynamic table column index auto-mapping (e.g. mapping "Item Name" directly to Part Name and "Part Number" exclusively to Part Number column)
+          let columnMapping: {
+            srIdx?: number;
+            partNumberIdx?: number;
+            partNameIdx?: number;
+            qtyIdx?: number;
+            priceIdx?: number;
+            amountIdx?: number;
+          } | null = null;
+
+          const isHeaderRow = (cells: string[]) => {
+            let matches = 0;
+            cells.forEach((cell) => {
+              const clean = cell ? String(cell).toLowerCase().trim() : '';
+              if (!clean) return;
+              if (
+                clean === 'sr' || clean === 'sr.' || clean === 's.no' || clean === 'sno' || clean.includes('serial') || clean.includes('sno') || clean === 's. no.' || clean === 'sr no' || clean === 'sr. no'
+              ) matches++;
+              else if (
+                clean.includes('part number') || clean.includes('part no') || clean === 'partnumber' || clean === 'partno' || clean.includes('item code') || clean.includes('part code') || clean.includes('slpart')
+              ) matches++;
+              else if (
+                clean.includes('item name') || clean.includes('part name') || clean.includes('description') || clean.includes('particular') || clean.includes('spare name') || clean.includes('glass/spare')
+              ) matches++;
+              else if (
+                clean === 'qty' || clean === 'quantity' || clean === 'qnty' || clean.includes('qty')
+              ) matches++;
+              else if (
+                clean === 'price' || clean === 'rate' || clean.includes('unit price') || clean.includes('unit rate') || clean.includes('price') || clean.includes('rate')
+              ) matches++;
+              else if (
+                clean === 'amount' || clean === 'total' || clean.includes('net amt') || clean.includes('net amount') || clean.includes('amount')
+              ) matches++;
+            });
+            return matches >= 2;
+          };
+
+          const extractColumnMapping = (cells: string[]) => {
+            const mapping: any = {};
+            let mappedCount = 0;
+            cells.forEach((cell, idx) => {
+              const clean = cell ? String(cell).toLowerCase().trim() : '';
+              if (!clean) return;
+              if (
+                clean === 'sr' || clean === 'sr.' || clean === 's.no' || clean === 'sno' || clean.includes('serial') || clean.includes('sno') || clean === 's. no.' || clean === 'sr no' || clean === 'sr. no'
+              ) {
+                mapping.srIdx = idx;
+                mappedCount++;
+              } else if (
+                clean.includes('part number') || clean.includes('part no') || clean === 'partnumber' || clean === 'partno' || clean.includes('item code') || clean.includes('part code') || clean.includes('slpart')
+              ) {
+                mapping.partNumberIdx = idx;
+                mappedCount++;
+              } else if (
+                clean.includes('item name') || clean.includes('part name') || clean.includes('description') || clean.includes('particular') || clean.includes('spare name') || clean.includes('glass/spare')
+              ) {
+                mapping.partNameIdx = idx;
+                mappedCount++;
+              } else if (
+                clean === 'qty' || clean === 'quantity' || clean === 'qnty' || clean.includes('qty')
+              ) {
+                mapping.qtyIdx = idx;
+                mappedCount++;
+              } else if (
+                clean === 'price' || clean === 'rate' || clean.includes('unit price') || clean.includes('unit rate') || clean.includes('price') || clean.includes('rate')
+              ) {
+                mapping.priceIdx = idx;
+                mappedCount++;
+              } else if (
+                clean === 'amount' || clean === 'total' || clean.includes('net amt') || clean.includes('net amount') || clean.includes('amount')
+              ) {
+                mapping.amountIdx = idx;
+                mappedCount++;
+              }
+            });
+
+            const hasIdentifier = mapping.partNumberIdx !== undefined || mapping.partNameIdx !== undefined;
+            const hasNumeric = mapping.qtyIdx !== undefined || mapping.priceIdx !== undefined || mapping.amountIdx !== undefined;
+
+            if (mappedCount >= 2 && hasIdentifier && hasNumeric) {
+              return mapping;
+            }
+            return null;
+          };
+
           const saveCurrentItem = () => {
             if (currentItem) {
               if (!currentItem.partNumber || currentItem.partNumber === '') {
@@ -286,11 +371,11 @@ export default function PdfEstimation() {
             // Sort page items descending vertically from top to bottom
             pageItems.sort((a, b) => b.transform[5] - a.transform[5]);
 
-            // Group text items by dynamic proximity of Y-coordinates (within 8.5 pixels)
+            // Group text items by dynamic proximity of Y-coordinates (within 13.5 pixels)
             const dynamicYRows: any[][] = [];
             pageItems.forEach((item) => {
               const y = item.transform[5];
-              let matchedRow = dynamicYRows.find((r) => Math.abs(r[0].transform[5] - y) < 8.5);
+              let matchedRow = dynamicYRows.find((r) => Math.abs(r[0].transform[5] - y) < 13.5);
               if (matchedRow) {
                 matchedRow.push(item);
               } else {
@@ -304,7 +389,7 @@ export default function PdfEstimation() {
               rawRow.sort((cellA, cellB) => cellA.transform[4] - cellB.transform[4]);
 
               // Merge text pieces that are very close horizontally (within 15 pixels)
-              const mergedCells: string[] = [];
+              const rawMergedCells: string[] = [];
               let currentCellText = '';
               let lastX = -999;
 
@@ -312,7 +397,7 @@ export default function PdfEstimation() {
                 const x = cell.transform[4];
                 if (lastX !== -999 && x - lastX > 15) {
                   if (currentCellText.trim()) {
-                    mergedCells.push(currentCellText.trim());
+                    rawMergedCells.push(currentCellText.trim());
                   }
                   currentCellText = cell.str;
                 } else {
@@ -321,103 +406,283 @@ export default function PdfEstimation() {
                 lastX = x + cell.width;
               });
               if (currentCellText.trim()) {
-                mergedCells.push(currentCellText.trim());
+                rawMergedCells.push(currentCellText.trim());
               }
 
-              const joinedStr = mergedCells.join(' ').trim();
-              const isHsnRow = joinedStr.toLowerCase().includes('hsn/sac');
-              const isPriceRow = joinedStr.toLowerCase().includes('unit') || joinedStr.toLowerCase().includes('customer') || joinedStr.toLowerCase().includes('ltr') || joinedStr.toLowerCase().includes('pcs');
-              const isTaxRow = joinedStr.match(/^\d+%\s*$/) || joinedStr.match(/^gst\s*\d+%\s*$/i);
-              
-              // Validate possible serial number prefix in a cell
-              const srMatch = mergedCells[0]?.trim().match(/^(\d+)$/);
+              // Pre-split any columns that got horizontally merged due to narrow padding (e.g. "1 16526999-" or "1.000Unit")
+              const mergedCells: string[] = [];
+              rawMergedCells.forEach((cell) => {
+                const trimmed = cell.trim();
+                
+                // 1. Serial + Part Number: e.g. "1 16526999-00" or "1 16526999-"
+                const srPn = trimmed.match(/^(\d+)\s+([A-Za-z0-9-]{5,25})$/);
+                if (srPn) {
+                  mergedCells.push(srPn[1]);
+                  mergedCells.push(srPn[2]);
+                  return;
+                }
 
-              // 1. Process candidate start
-              if (srMatch) {
-                // Archive preceding candidate
-                saveCurrentItem();
-
-                const srNum = parseInt(srMatch[1], 10);
-                currentItem = {
-                  sr: srNum,
-                  partNumber: 'N/A',
-                  partName: '',
-                  qty: 1,
-                  unitCategory: 'PCS',
-                  price: 0,
-                  taxes: 18,
-                  amount: 0
-                };
-
-                // Extract Part number and Part name
-                if (mergedCells.length >= 2) {
-                  const rawCell = mergedCells[1] || '';
-                  const partNo8_2Match = rawCell.match(/^(\d{8}-\d{2})(.*)$/);
-                  if (partNo8_2Match) {
-                    currentItem.partNumber = partNo8_2Match[1];
-                    currentItem.partName = partNo8_2Match[2].trim();
-                  } else {
-                    const firstSpaceIdx = rawCell.search(/\s/);
-                    if (firstSpaceIdx !== -1) {
-                      const firstPart = rawCell.substring(0, firstSpaceIdx).trim();
-                      const secondPart = rawCell.substring(firstSpaceIdx + 1).trim();
-                      if (/[0-9]/.test(firstPart) && firstPart.length >= 5 && !/^[0-9.,]+$/.test(firstPart)) {
-                        currentItem.partNumber = firstPart;
-                        currentItem.partName = secondPart;
-                      } else {
-                        currentItem.partNumber = 'N/A';
-                        currentItem.partName = rawCell;
-                      }
+                // 2. Contains quantity + unit + rest: e.g. "1.000Unit Customer 47,734.09 GST"
+                const hasNumber = /\d/.test(trimmed);
+                const hasThreeOrMoreSpaces = (trimmed.match(/\s/g) || []).length >= 2;
+                if (hasNumber && hasThreeOrMoreSpaces && (trimmed.toLowerCase().includes('unit') || trimmed.toLowerCase().includes('customer') || trimmed.toLowerCase().includes('gst') || trimmed.toLowerCase().includes('%'))) {
+                  const parts = trimmed.split(/\s+/);
+                  parts.forEach(p => {
+                    const qtyUnit = p.match(/^(\d+(?:\.\d+)?)([A-Za-z]+)$/);
+                    if (qtyUnit) {
+                      mergedCells.push(qtyUnit[1]);
+                      mergedCells.push(qtyUnit[2]);
                     } else {
-                      currentItem.partNumber = 'N/A';
-                      currentItem.partName = rawCell;
+                      mergedCells.push(p);
+                    }
+                  });
+                  return;
+                }
+
+                // 3. Single mixed word: e.g. "1.000Unit"
+                const qtyUnit = trimmed.match(/^(\d+(?:\.\d+)?)([A-Za-z]{3,10})$/);
+                if (qtyUnit) {
+                  mergedCells.push(qtyUnit[1]);
+                  mergedCells.push(qtyUnit[2]);
+                  return;
+                }
+
+                mergedCells.push(cell);
+              });
+
+              const joinedStr = mergedCells.join(' ').trim();
+              if (joinedStr.length < 2) return;
+
+              // Identify layout noise and skip
+              const joinedLower = joinedStr.toLowerCase();
+              const isMetadataNoise = 
+                joinedLower.includes('spares estimate') ||
+                joinedLower.includes('customer & vehicle') ||
+                joinedLower.includes('demanded repair') ||
+                joinedLower.includes('registered name') ||
+                joinedLower.includes('office add') ||
+                joinedLower.includes('gstin') ||
+                joinedLower.includes('email') ||
+                joinedLower.includes('page:') ||
+                joinedLower.includes('tax invoice') ||
+                joinedLower.includes('proforma invoice') ||
+                joinedLower.includes('job card') ||
+                joinedLower.includes('jobcard') ||
+                joinedLower.includes('subtotal') ||
+                joinedLower.includes('grand total') ||
+                joinedLower.includes('surveyor name') ||
+                joinedLower.includes('authorized signatory') ||
+                joinedLower.includes('hsn/sac') ||
+                joinedLower.includes('sac code') ||
+                joinedLower.includes('total (inr)') ||
+                joinedLower.includes('estimate copy') ||
+                joinedLower.includes('parts checklist') ||
+                joinedLower.includes('order details');
+
+              if (isMetadataNoise) return;
+
+              if (isHeaderRow(mergedCells)) {
+                const newMapping = extractColumnMapping(mergedCells);
+                if (newMapping) {
+                  columnMapping = newMapping;
+                }
+                return;
+              }
+
+              // Parse using centralized robust mapper
+              const cellToVal = (valStr: string) => valStr ? String(valStr).trim() : '';
+
+              // Extract parsed results using column index mapping or content heuristics
+              let srVal = tempSrCounter;
+              let partNumber = '';
+              let partName = '';
+              let qty = 1;
+              let price = 0;
+              let taxes = 18;
+              let amount = 0;
+              let unitCategory = 'PCS';
+
+              const srMatch = (mergedCells[0] !== null && mergedCells[0] !== undefined) ? String(mergedCells[0]).trim().match(/^(\d+)$/) : null;
+
+              if (columnMapping) {
+                if (columnMapping.srIdx !== undefined && mergedCells[columnMapping.srIdx] !== undefined) {
+                  const val = parseInt(cellToVal(mergedCells[columnMapping.srIdx]), 10);
+                  if (!isNaN(val)) srVal = val;
+                } else if (srMatch) {
+                  srVal = parseInt(srMatch[1], 10);
+                }
+
+                if (columnMapping.partNumberIdx !== undefined && mergedCells[columnMapping.partNumberIdx] !== undefined) {
+                  const cleaned = cellToVal(mergedCells[columnMapping.partNumberIdx])
+                    .replace(/[\[\(\{\}\)\]]/g, '')
+                    .trim()
+                    .toUpperCase();
+                  if (cleaned && cleaned !== 'N/A' && cleaned !== 'PART NUMBER' && cleaned !== 'PART NO') {
+                    partNumber = cleaned;
+                  }
+                }
+
+                if (columnMapping.partNameIdx !== undefined && mergedCells[columnMapping.partNameIdx] !== undefined) {
+                  const val = cellToVal(mergedCells[columnMapping.partNameIdx]);
+                  if (val && val !== 'ITEM NAME' && val !== 'PART NAME' && val !== 'DESCRIPTION' && val !== 'PARTICULARS') {
+                    partName = val;
+                  }
+                }
+
+                if (columnMapping.qtyIdx !== undefined && mergedCells[columnMapping.qtyIdx] !== undefined) {
+                  const val = parseFloat(cellToVal(mergedCells[columnMapping.qtyIdx]).replace(/[^\d.]/g, ''));
+                  if (!isNaN(val) && val > 0) qty = val;
+                }
+
+                if (columnMapping.priceIdx !== undefined && mergedCells[columnMapping.priceIdx] !== undefined) {
+                  const val = parseFloat(cellToVal(mergedCells[columnMapping.priceIdx]).replace(/[^\d.]/g, ''));
+                  if (!isNaN(val)) price = val;
+                }
+
+                if (columnMapping.amountIdx !== undefined && mergedCells[columnMapping.amountIdx] !== undefined) {
+                  const val = parseFloat(cellToVal(mergedCells[columnMapping.amountIdx]).replace(/[^\d.]/g, ''));
+                  if (!isNaN(val)) amount = val;
+                }
+              }
+
+              // Fallback heuristic for part number if column auto-mapping wasn't successful or partsNumber was empty
+              if (!partNumber) {
+                let detectedPn = '';
+                const hyphenPattern = /\b([A-Za-z0-9]{3,12}-[A-Za-z0-9]{1,5})\b/;
+                const pureNumericPattern = /\b(\d{8,11})\b/;
+                const alphanumericPattern = /\b(?=[A-Za-z]*\d)(?=\d*[A-Za-z])([A-Za-z0-9]{6,15})\b/;
+
+                for (let i = 0; i < mergedCells.length; i++) {
+                  if (columnMapping && (i === columnMapping.qtyIdx || i === columnMapping.priceIdx || i === columnMapping.amountIdx)) continue;
+                  const cellText = cellToVal(mergedCells[i]);
+                  const match = cellText.match(hyphenPattern) || cellText.match(pureNumericPattern) || cellText.match(alphanumericPattern);
+                  if (match) {
+                    const foundPn = match[1].trim();
+                    const isDate = /^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$/.test(foundPn);
+                    const isUnitOrTax = /^(pcs|set|unit|ltr|kg|box|nos|no|qty|gst|tax|hsn|sac)\d*%?$/i.test(foundPn);
+                    const isDecimalFloat = /^\d+\.\d+$/.test(foundPn);
+
+                    if (!isDate && !isUnitOrTax && !isDecimalFloat) {
+                      detectedPn = foundPn.toUpperCase();
+                      break;
                     }
                   }
                 }
+                partNumber = detectedPn;
+              }
 
-                // If pricing parameters exist on the same line, extract them immediately
-                const checkPricing = tryParseNumericCell(joinedStr);
-                if (checkPricing) {
-                  currentItem.qty = checkPricing.qty;
-                  currentItem.unitCategory = checkPricing.unitCategory;
-                  currentItem.price = checkPricing.price;
-
-                  const amountMatch = joinedStr.match(/([\d,.]+)\s*(?:₹|INR)?\s*$/i);
-                  if (amountMatch) {
-                    currentItem.amount = parseFloat(amountMatch[1].replace(/,/g, ''));
-                  }
+              // Parse leftover texts as Part Name if was not clearly extracted via columns
+              const cleanedCellsFromPn: string[] = [];
+              mergedCells.forEach((cell, idx) => {
+                if (columnMapping) {
+                  if (idx === columnMapping.srIdx || idx === columnMapping.qtyIdx || idx === columnMapping.priceIdx || idx === columnMapping.amountIdx) return;
                 }
-              } else if (currentItem) {
-                // Secondary / supplemental row mapping state machine
-                if (isHsnRow) {
-                  // Capture tax rate if declared on HSN line
-                  const taxMatch = joinedStr.match(/(\d+)%/);
-                  if (taxMatch) {
-                    currentItem.taxes = parseInt(taxMatch[1], 10);
-                  }
-                } else if (isPriceRow) {
-                  const pricing = tryParseNumericCell(joinedStr);
-                  if (pricing) {
-                    currentItem.qty = pricing.qty;
-                    currentItem.unitCategory = pricing.unitCategory;
-                    currentItem.price = pricing.price;
-                  }
+                let cellText = cellToVal(cell);
+                if (!cellText) return;
 
-                  const amountMatch = joinedStr.match(/([\d,.]+)\s*(?:₹|INR)?\s*$/i);
-                  if (amountMatch) {
-                    currentItem.amount = parseFloat(amountMatch[1].replace(/,/g, ''));
+                if (srMatch && cellText === srMatch[1]) return;
+                if (partNumber && cellText.toUpperCase().includes(partNumber)) {
+                  cellText = cellText.replace(new RegExp(partNumber, 'gi'), '').trim();
+                }
+
+                const isUnit = /^(pcs|set|unit|ltr|kg|box|nos|no|qty)$/i.test(cellText);
+                if (isUnit) {
+                  unitCategory = cellText.toUpperCase();
+                  return;
+                }
+
+                const isTax = /^\d+%\s*$/i.test(cellText) || /^gst\s*\d+%\s*$/i.test(cellText);
+                if (isTax) {
+                  const match = cellText.match(/(\d+)/);
+                  if (match) taxes = parseInt(match[1], 10);
+                  return;
+                }
+
+                const cleanNumStr = cellText.replace(/[^\d.]/g, '');
+                const numVal = parseFloat(cleanNumStr);
+                if (!isNaN(numVal) && numVal > 0 && cleanNumStr.length < 9) return;
+
+                if (cellText) cleanedCellsFromPn.push(cellText);
+              });
+
+              if (!partName) {
+                partName = cleanedCellsFromPn.join(' ').trim();
+              }
+
+              // Extract pure numeric fallback list if not direct column indexes mapped
+              if (!price || !amount || (price <= 5 && amount > 100)) {
+                const numbersInRow: number[] = [];
+                mergedCells.forEach((cell, cellIdx) => {
+                  if (columnMapping && (cellIdx === columnMapping.srIdx || cellIdx === columnMapping.qtyIdx || cellIdx === columnMapping.priceIdx || cellIdx === columnMapping.amountIdx)) return;
+                  const cellCleanVal = cellToVal(cell);
+                  if (cellCleanVal.includes('%')) return;
+                  if (/^(pcs|set|unit|ltr|kg|box|nos|no|qty|hsn|sac|gst|tax)$/i.test(cellCleanVal)) return;
+
+                  const cleanDigitsStr = cellCleanVal.replace(/[^\d.]/g, '');
+                  const val = parseFloat(cleanDigitsStr);
+                  if (!isNaN(val) && val > 0 && cleanDigitsStr.length < 9) {
+                    numbersInRow.push(val);
                   }
-                } else if (isTaxRow) {
-                  const taxMatch = joinedStr.match(/(\d+)/);
-                  if (taxMatch) {
-                    currentItem.taxes = parseInt(taxMatch[1], 10);
-                  }
+                });
+
+                if (numbersInRow.length >= 3) {
+                  if (!qty) qty = numbersInRow[0];
+                  if (!price) price = numbersInRow[1];
+                  if (!amount) amount = numbersInRow[2];
+                } else if (numbersInRow.length === 2) {
+                  if (!price) price = numbersInRow[0];
+                  if (!amount) amount = numbersInRow[1];
+                  qty = Math.max(1, Math.round(amount / price));
+                } else if (numbersInRow.length === 1) {
+                  if (!price) price = numbersInRow[0];
+                  amount = price * qty;
+                }
+              }
+
+              if (!amount && price) {
+                amount = price * qty;
+              }
+
+              // A row is considered a distinct new part line item if:
+              // - It has an explicit Serial Number prefix
+              // - Or we found an alphanumeric part number
+              // - Or we have numbers like Price and Qty
+              const numbersList: number[] = [];
+              mergedCells.forEach((cell) => {
+                const cleanDigitsStr = cellToVal(cell).replace(/[^\d.]/g, '');
+                const val = parseFloat(cleanDigitsStr);
+                if (!isNaN(val) && val > 0 && cleanDigitsStr.length < 9 && !cellToVal(cell).includes('%')) {
+                  numbersList.push(val);
+                }
+              });
+
+              const isNewItem = srMatch || (partNumber && partNumber !== 'N/A') || numbersList.length >= 2;
+
+              if (isNewItem) {
+                saveCurrentItem();
+
+                if (srMatch) {
+                  srVal = parseInt(srMatch[1], 10);
+                  tempSrCounter = srVal + 1;
                 } else {
-                  // Wrapped description continuation row
-                  const isNoise = joinedStr.match(/(?:spares\s*estimate|customer\s*&\s*vehicle|demanded\s*repair|accidenatal\s*repair|registered\s*name|office\s*add|gstin|email|page:\s*\d+|kristan|service\s*cost)/i);
-                  if (!isNoise && joinedStr.replace(/[^A-Za-z]/g, '').length > 2) {
-                    currentItem.partName += (currentItem.partName ? ' ' : '') + joinedStr;
-                  }
+                  srVal = tempSrCounter;
+                  tempSrCounter++;
+                }
+
+                currentItem = {
+                  sr: srVal,
+                  partNumber: partNumber || 'N/A',
+                  partName: partName || 'Automotive Component',
+                  qty: qty || 1,
+                  unitCategory: unitCategory || 'PCS',
+                  price: price || 0,
+                  taxes: taxes || 18,
+                  amount: amount || ((qty || 1) * (price || 0))
+                };
+              } else if (currentItem) {
+                const cleanJoinedStr = cleanedCellsFromPn.join(' ').trim();
+                if (cleanJoinedStr.replace(/[^A-Za-z]/g, '').length > 2) {
+                  currentItem.partName += ' ' + cleanJoinedStr;
                 }
               }
             });
@@ -510,24 +775,103 @@ export default function PdfEstimation() {
           }
 
           if (extractedItems.length === 0) {
-            // Let's implement regex fallback to parse line by line
+            // Let's implement regex fallback to parse line by line using double space splitting
             const allTextLines = fullCombinedText.split('\n');
+            let fallbackSrVal = 1;
             allTextLines.forEach((line) => {
-              // look for sr, code, description, qty, category, price, taxes, amount
-              const matches = line.match(/^(\d+)\s+([A-Za-z0-9\-]+)\s+([A-Za-z0-9\s\-\(\)\/]{3,30})\s+(\d+)\s+([A-Za-z]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)$/);
-              if (matches) {
-                extractedItems.push({
-                  id: Math.random().toString(36).substring(2, 9),
-                  sr: parseInt(matches[1]),
-                  partNumber: matches[2],
-                  partName: matches[3],
-                  status: '✔️APPROVED',
-                  qty: parseInt(matches[4]),
-                  unitCategory: matches[5],
-                  price: parseFloat(matches[6].replace(/,/g, '')),
-                  taxes: parseFloat(matches[7].replace(/,/g, '')),
-                  amount: parseFloat(matches[8].replace(/,/g, '')),
+              const trimmed = line.trim();
+              if (trimmed.length < 5) return;
+              
+              // Split line by double spaces or tabs to isolate columns
+              const spaceCells = trimmed.split(/\s{2,}/);
+              if (spaceCells.length >= 3) {
+                const joinedLower = trimmed.toLowerCase();
+                if (
+                  joinedLower.includes('subtotal') || 
+                  joinedLower.includes('grand total') || 
+                  joinedLower.includes('job card') || 
+                  joinedLower.includes('insurance') ||
+                  joinedLower.includes('invoice') ||
+                  joinedLower.includes('vehicle') ||
+                  joinedLower.includes('page:')
+                ) {
+                  return;
+                }
+
+                const srMatch = spaceCells[0].trim().match(/^(\d+)$/);
+                let srVal = srMatch ? parseInt(srMatch[1], 10) : fallbackSrVal;
+                if (!srMatch) {
+                  fallbackSrVal++;
+                } else {
+                  fallbackSrVal = srVal + 1;
+                }
+
+                const rightCells = spaceCells.slice(srMatch ? 1 : 0);
+                const numbers: number[] = [];
+                let partNum = 'N/A';
+                const nameWords: string[] = [];
+                let unitCategory = 'PCS';
+
+                rightCells.forEach(cell => {
+                  const valTrim = cell.trim();
+                  if (valTrim === '') return;
+                  
+                  // Robust part number candidate validation for fallback
+                  const hasDigits = /[0-9]/.test(valTrim);
+                  const isProbablePn = valTrim.length >= 5 && valTrim.length <= 25 && !valTrim.includes(' ') && !valTrim.includes('%');
+                  const isDate = /^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$/.test(valTrim);
+                  const isUnitOrTax = /^(pcs|set|unit|ltr|kg|box|nos|no|qty|gst|tax|hsn|sac)\d*%?$/i.test(valTrim);
+                  const isDecimalFloat = /^\d+\.\d+$/.test(valTrim);
+
+                  if (hasDigits && isProbablePn && !isDate && !isUnitOrTax && !isDecimalFloat) {
+                    partNum = valTrim.toUpperCase();
+                    return;
+                  }
+
+                  const isUnit = /^(pcs|set|unit|ltr|kg|box|nos|no|qty)$/i.test(valTrim);
+                  if (isUnit) {
+                    unitCategory = valTrim.toUpperCase();
+                    return;
+                  }
+
+                  const cleanNum = valTrim.replace(/[^\d.]/g, '');
+                  const num = parseFloat(cleanNum);
+                  if (!isNaN(num) && num > 0 && !valTrim.includes('%') && valTrim.replace(/[^\d.]/g, '').length === valTrim.length) {
+                    numbers.push(num);
+                    return;
+                  }
+                  
+                  nameWords.push(valTrim);
                 });
+
+                if (numbers.length >= 1) {
+                  let qty = 1;
+                  let price = numbers[0];
+                  let amount = price * qty;
+                  if (numbers.length >= 2) {
+                    price = numbers[0];
+                    amount = numbers[1];
+                    qty = Math.max(1, Math.round(amount / price));
+                  }
+                  if (numbers.length >= 3) {
+                    qty = numbers[0];
+                    price = numbers[1];
+                    amount = numbers[2];
+                  }
+
+                  extractedItems.push({
+                    id: Math.random().toString(36).substring(2, 9),
+                    sr: srVal,
+                    partNumber: partNum,
+                    partName: nameWords.join(' ') || 'Automotive Component',
+                    status: '✔️APPROVED',
+                    qty,
+                    unitCategory: unitCategory as any,
+                    price,
+                    taxes: 18,
+                    amount
+                  });
+                }
               }
             });
           }
@@ -972,9 +1316,6 @@ export default function PdfEstimation() {
 
   // High fidelity raw HTML window quotation generator for beautiful printing
   const handlePrintQuotation = () => {
-    const printWin = window.open('', '_blank');
-    if (!printWin) return;
-
     // Format individual table entries
     const tableRows = items.map((it) => {
       // Inline status indicator pill formatting for print mode
@@ -1010,7 +1351,7 @@ export default function PdfEstimation() {
       year: 'numeric',
     });
 
-    printWin.document.write(`
+    const fullPrintDocHtml = `
       <html>
         <head>
           <title>Quotation — HARMAN AUTO BOT v3.0</title>
@@ -1212,12 +1553,12 @@ export default function PdfEstimation() {
               <div>
                 <div class="meta-field">
                   <span class="meta-label">Job Card Number</span>
-                  <div class="meta-value" style="font-family: monospace; color: #1E3A8A;">${details.jobCardNo || '—'}</div>
+                  <div class="meta-value" style="font-family: monospace; color: #1E3A8A;">${details.jobCardNo || "—"}</div>
                 </div>
                 <div class="meta-field" style="margin-top: 10px;">
                   <span class="meta-label">Insurance / Surveyor</span>
                   <div class="meta-value" style="font-size: 13px; color: #374151;">
-                    ${details.insuranceCompany || 'Cash Work'} ${details.surveyorName ? ` / ${details.surveyorName}` : ''}
+                    ${details.insuranceCompany || "Cash Work"} ${details.surveyorName ? ` / ${details.surveyorName}` : ""}
                   </div>
                 </div>
               </div>
@@ -1258,15 +1599,15 @@ export default function PdfEstimation() {
               <table class="totals-table">
                 <tr>
                   <td style="color: #6B7280; font-weight: 500;">Approved Parts Subtotal</td>
-                  <td style="text-align: right; font-weight: bold; font-family: monospace;">₹${calculations.subtotal.toLocaleString('en-IN')}</td>
+                  <td style="text-align: right; font-weight: bold; font-family: monospace;">₹${calculations.subtotal.toLocaleString("en-IN")}</td>
                 </tr>
                 <tr>
                   <td style="color: #6B7280; font-weight: 500;">Aggregated GST (Taxes)</td>
-                  <td style="text-align: right; font-weight: bold; font-family: monospace; color: #4B5563;">₹${calculations.totalTaxAmount.toLocaleString('en-IN')}</td>
+                  <td style="text-align: right; font-weight: bold; font-family: monospace; color: #4B5563;">₹${calculations.totalTaxAmount.toLocaleString("en-IN")}</td>
                 </tr>
                 <tr class="totals-row-prime">
                   <td>GRAND TOTAL (INR)</td>
-                  <td style="text-align: right; font-family: monospace;">₹${calculations.grandTotal.toLocaleString('en-IN')}</td>
+                  <td style="text-align: right; font-family: monospace;">₹${calculations.grandTotal.toLocaleString("en-IN")}</td>
                 </tr>
               </table>
             </div>
@@ -1289,8 +1630,46 @@ export default function PdfEstimation() {
           </div>
         </body>
       </html>
-    `);
-    printWin.document.close();
+    `;
+
+    // Try normal window open first
+    const printWin = window.open('', '_blank');
+    if (printWin) {
+      printWin.document.write(fullPrintDocHtml);
+      printWin.document.close();
+    } else {
+      // Robust Fallback: create dynamic hidden iframe to bypass sandboxed iframe popup blockers
+      const iframe = document.createElement('iframe');
+      // Position offscreen so it compiles invisibly
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow?.document || iframe.contentDocument;
+      if (doc) {
+        doc.open();
+        doc.write(fullPrintDocHtml);
+        doc.close();
+
+        // Moderate timeout to ensure document scripts and loads complete
+        setTimeout(() => {
+          try {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+          } catch (e) {
+            console.error('Iframe fallback printing failed:', e);
+          }
+          // Safely clean up reference after small buffer
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+          }, 1500);
+        }, 500);
+      }
+    }
   };
 
   return (
@@ -1307,8 +1686,14 @@ export default function PdfEstimation() {
               v3.0 Engine
             </span>
           </div>
-          <h2 className="text-xl font-sans font-black tracking-tight text-gray-800 flex items-center gap-2">
-            👨‍🔧 PDF Estimation & Quotation Creator
+          <h2 className="text-xl font-sans font-black tracking-tight text-gray-800 flex items-center flex-wrap gap-2">
+            <span>👨‍🔧 PDF Estimation & Quotation Creator</span>
+            {isParsing && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200 animate-pulse">
+                <RefreshCw className="w-3 h-3 animate-spin text-amber-600" />
+                Parsing PDF...
+              </span>
+            )}
           </h2>
           <p className="text-xs text-slate-500 mt-1 leading-normal max-w-2xl">
             Upload workshop PDF estimation reports to automatically extract items, override customer metrics, assign specific approval consensus, and compile beautiful print-ready invoice quotations.
