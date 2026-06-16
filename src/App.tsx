@@ -54,7 +54,7 @@ import PdfEstimation from './components/PdfEstimation';
 import SupplementarySection from './components/SupplementarySection';
 
 import { PDFDocument } from 'pdf-lib';
-import { PdfTextBlock, PdfEdit, AllEdits, PartOrder, User, Vehicle, PartsMasterItem } from './types';
+import { PdfTextBlock, PdfEdit, AllEdits } from './types';
 import { generateSamplePdf } from './utils/pdfGenerator';
 import { exportModifiedPdf } from './utils/pdfModifier';
 
@@ -361,74 +361,6 @@ export default function App() {
   // Dashboard category filter and search query
   const [dashboardSearchQuery, setDashboardSearchQuery] = useState('');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>('all');
-
-  // Supplementary Section States
-  const [parts, setParts] = useState<PartOrder[]>(() => {
-    try {
-      const saved = localStorage.getItem('harman_supplementary_parts');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [vehicles, setVehicles] = useState<Vehicle[]>(() => {
-    try {
-      const saved = localStorage.getItem('harman_supplementary_vehicles');
-      return saved ? JSON.parse(saved) : [
-        { id: 'v1', regNo: 'HR10AU4455', customer: 'BALJIT KAUR', jc: 'KRS-2627', status: 'In Progress' },
-        { id: 'v2', regNo: 'DL1CAB4596', customer: 'Trilok Singh', jc: 'JC-2026-089', status: 'In Progress' }
-      ];
-    } catch {
-      return [
-        { id: 'v1', regNo: 'HR10AU4455', customer: 'BALJIT KAUR', jc: 'KRS-2627', status: 'In Progress' },
-        { id: 'v2', regNo: 'DL1CAB4596', customer: 'Trilok Singh', jc: 'JC-2026-089', status: 'In Progress' }
-      ];
-    }
-  });
-
-  const [partsMaster] = useState<PartsMasterItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('harman_parts_master');
-      return saved ? JSON.parse(saved) : [
-        { id: 'm1', partNo: '16361103-00', partName: 'Front bumper body', price: 13704.30 },
-        { id: 'm2', partNo: '13442619-00', partName: 'LEFT BRACKET, BUMPER, FRONT', price: 347.14 },
-        { id: 'm3', partNo: '13499409-00', partName: 'LEFT TRIM, BUMPER, FRONT', price: 480.41 },
-        { id: 'm4', partNo: '15504931-00', partName: 'Active grille assembly', price: 8160.99 },
-        { id: 'm5', partNo: '13499336-00', partName: 'Front bumper lower intake grille left reinforcement plate', price: 474.22 }
-      ];
-    } catch {
-      return [];
-    }
-  });
-
-  const currentUser: User = {
-    canWrite: true,
-    canDelete: true
-  };
-
-  useEffect(() => {
-    localStorage.setItem('harman_supplementary_parts', JSON.stringify(parts));
-  }, [parts]);
-
-  useEffect(() => {
-    localStorage.setItem('harman_supplementary_vehicles', JSON.stringify(vehicles));
-  }, [vehicles]);
-
-  const handleSavePart = (p: PartOrder) => {
-    setParts(prev => {
-      const exists = prev.some(x => x.id === p.id);
-      if (exists) {
-        return prev.map(x => x.id === p.id ? p : x);
-      }
-      return [p, ...prev];
-    });
-  };
-
-  const handleDeletePart = (id: string) => {
-    setParts(prev => prev.map(p => p.id === id ? { ...p, isDeleted: true } : p));
-  };
-
 
   // Document states
   const [originalPdfBytes, setOriginalPdfBytes] = useState<Uint8Array | null>(null);
@@ -831,6 +763,16 @@ export default function App() {
       <div className="bg-slate-100 border-b border-gray-200 px-6 py-2 flex items-center justify-between shrink-0 select-none">
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setActiveView('dashboard')}
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+              activeView === 'dashboard'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-gray-600 hover:bg-gray-200/60 hover:text-gray-900'
+            }`}
+          >
+            🎛️ Toolbox Dashboard
+          </button>
+          <button
             onClick={() => setActiveView('editor')}
             className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
               activeView === 'editor'
@@ -844,21 +786,21 @@ export default function App() {
             onClick={() => setActiveView('estimation')}
             className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
               activeView === 'estimation'
-                ? 'bg-red-600 text-white shadow-xs'
+                ? 'bg-blue-600 text-white shadow-xs'
                 : 'text-gray-600 hover:bg-gray-200/60 hover:text-gray-900'
             }`}
           >
-            👨‍🔧 PDF Estimation & Quotations
+            📋 Estimate Sheet
           </button>
           <button
             onClick={() => setActiveView('supplementary')}
             className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
               activeView === 'supplementary'
-                ? 'bg-purple-600 text-white shadow-xs'
+                ? 'bg-blue-600 text-white shadow-xs'
                 : 'text-gray-600 hover:bg-gray-200/60 hover:text-gray-900'
             }`}
           >
-            🛠️ Supplementary Parts Tracker
+            🛠️ Supplementary comparing Sheet
           </button>
         </div>
         <div className="text-[10px] text-gray-500 font-mono font-bold uppercase tracking-widest hidden sm:block">
@@ -869,7 +811,11 @@ export default function App() {
       {/* Main Sandbox Workspace Layout */}
       <div className="flex-1 flex overflow-hidden">
         
-        {activeView === 'dashboard' ? (
+        {activeView === 'estimation' ? (
+          <PdfEstimation />
+        ) : activeView === 'supplementary' ? (
+          <SupplementarySection />
+        ) : activeView === 'dashboard' ? (
           <div className="flex-1 bg-slate-50 overflow-y-auto px-4 py-8 md:px-8 relative select-none flex flex-col" id="dashboard_panel">
             {/* Ambient Background Glow Decoration */}
             <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-100 rounded-full mix-blend-multiply filter blur-3xl opacity-15 animate-pulse pointer-events-none" />
@@ -989,19 +935,6 @@ export default function App() {
 
             </div>
           </div>
-        ) : activeView === 'supplementary' ? (
-          <div className="flex-1 bg-[#0a0c16] text-slate-200 overflow-y-auto p-6">
-            <SupplementarySection
-              parts={parts}
-              partsMaster={partsMaster}
-              vehicles={vehicles}
-              currentUser={currentUser}
-              onSavePart={handleSavePart}
-              onDeletePart={handleDeletePart}
-            />
-          </div>
-        ) : activeView === 'estimation' ? (
-          <PdfEstimation />
         ) : pdfDoc ? (
           /* Editor Layout Mode */
           <>
